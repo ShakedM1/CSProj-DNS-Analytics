@@ -1,0 +1,1 @@
+Log File Created 3/11/2018 9:28:41 PMNetwork Interface: 3. Network adapter 'Microsoft' on local host
