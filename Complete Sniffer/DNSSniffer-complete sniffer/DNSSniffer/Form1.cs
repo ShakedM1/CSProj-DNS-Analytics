@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -18,42 +18,44 @@ using System.Text.RegularExpressions;
 
 namespace DNSSniffer
 {
-     
+
     public partial class Form1 : Form
     {
         public static bool savelog = true;
-        public int CaptureIndex;      
+        public int CaptureIndex;
         //get all live capture devices
         IList<LivePacketDevice> allDevices = LivePacketDevice.AllLocalMachine;
         public bool sniffing = false;
-        public static string logpath = GetUniqueFilePath(@"C:\log.txt");
+        public string logpath = GetUniqueFilePath(@"C:\log.txt");
         public Form1()
         {
             InitializeComponent();
+            TrainModel();
+            //MessageBox.Show(CheckUrl("https://web.mashov.info/students/").ToString());
             GetCaptureDevices();
         }
 
-        
+
         private void SelectInterface_Click(object sender, EventArgs e)
-        {            
+        {
             int selected;
-            
+
             if (InterfaceListBox.SelectedItem != null && !sniffing)
             {
-                
+
                 selected = InterfaceListBox.SelectedIndex;
                 MessageBox.Show(selected.ToString());
                 CaptureIndex = selected;
-                InterfaceStatus.Text = "Status: "+InterfaceListBox.SelectedItem.ToString()+" Selected";
+                InterfaceStatus.Text = "Status: " + InterfaceListBox.SelectedItem.ToString() + " Selected";
             }
             else
             {
                 if (sniffing)
                     MessageBox.Show("You have to stop sniffing to change interface!");
                 else
-                MessageBox.Show("Please select an interface");
+                    MessageBox.Show("Please select an interface");
             }
-                
+
         }
 
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
@@ -91,7 +93,7 @@ namespace DNSSniffer
 
         private void SniffButton_Click(object sender, EventArgs e)
         {
-            if (backgroundWorker1.IsBusy != true )
+            if (backgroundWorker1.IsBusy != true)
             {
                 // Start the asynchronous operation.
                 backgroundWorker1.RunWorkerAsync();
@@ -146,7 +148,7 @@ namespace DNSSniffer
         public void AddToListView(string time, string ip, string report)
         {
             ListViewItem item = new ListViewItem();
-            item.Text = time;        
+            item.Text = time;
             //item.SubItems.Add(time);
             item.SubItems.Add(ip);
             item.SubItems.Add(report);
@@ -158,7 +160,7 @@ namespace DNSSniffer
         {
 
         }
-        
+
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
         {
             // Take the selected adapter
@@ -211,11 +213,18 @@ namespace DNSSniffer
 
                                     if (domain != null)
                                     {
-                                        AddToListView(timestamp, ip.Source.ToString(), domain.ToString());
+                                        string url = domain.ToString();
+                                        bool malicious = CheckUrl(url);// CheckUrl(url); bool storing if the url is potentially malicious
+                                        if (malicious)
+                                        {
+                                            CloseBrowsers();
+                                            url += " Potentially Malicious, browser terminated";
+                                        }//malicious url detected
+                                        AddToListView(timestamp, ip.Source.ToString(), url);
                                         //add the packet details to the log file
                                         if (savelog)
                                         {
-                                            string str = timestamp + " " + ip.Source.ToString() + " " + domain.ToString();
+                                            string str = timestamp + " " + ip.Source.ToString() + " " + url;
                                             Appendlog(logpath, str);
                                         }
                                         //Console.WriteLine(domain.ToString());
@@ -229,7 +238,7 @@ namespace DNSSniffer
                     }
                 } while (!backgroundWorker1.CancellationPending);
             }
-        
+
         }//background worker
 
         private void ReportListView_SelectedIndexChanged_1(object sender, EventArgs e)
@@ -278,13 +287,70 @@ namespace DNSSniffer
             }
         }//appendlog
 
+        public static void CloseBrowsers()
+        {
+            CSharp2Python py = new CSharp2Python();
+            //create a temp .txt file for text manipulation
+            string str = py.ExecuteCommandWithReturn("tasklist");
+            string temppath = @"\temptask.txt";
+            Console.WriteLine(str);
+            System.IO.File.WriteAllText(@"\temptask.txt", str);
+            string[] lines = System.IO.File.ReadAllLines(temppath);
+            //check each proccess for it being a browser and if so close it
+            foreach (string line in lines)
+            {
+                if (line.Contains("chrome.exe"))
+                {
+                    Console.WriteLine("*************************");
+                    Console.WriteLine("there's chrome");
+                    py.ExecuteCommand("TASKKILL /F /IM chrome.exe");
+                }//chrome
+                if (line.Contains("iexplore.exe"))
+                {
+                    Console.WriteLine("*************************");
+                    Console.WriteLine("theres explorer");
+                    py.ExecuteCommand("TASKKILL /F /IM iexplore.exe");
+                }//explorer                                  
+            }
+            //delete the temp file
+            System.IO.File.Delete(temppath);
+        }//closebrowsers
+        public static bool CheckUrl(string url)
+        {
+            CSharp2Python py = new CSharp2Python();
+            string path = GetScriptPath("");
+            string result = py.ExecuteCommandWithReturn("cd " + path + "&" + "python -c \"import classify; classify.checkurl('" + url + "')\"");
+            if (result.Contains("1"))
+                return true;
+            else
+                return false;
+        }//checkurl
+
+        public static void TrainModel()
+        {
+            string str = @"..\..\TrainedModel\complete_model.sav";
+            if (!File.Exists(str))
+            {
+                CSharp2Python py = new CSharp2Python();
+                MessageBox.Show("creating model...");
+                string p1 = "\"" + GetScriptPath("predicturl.py") + "\"";
+                py.ExecuteScript(p1);
+            }
+        }//Train Model
+
+        public static string GetScriptPath(string scriptname)
+        {
+            string path = Path.GetFullPath(@"..\..\Scripts\" + scriptname);
+            return path;
+        }
+
         private void settingsbtn_Click(object sender, EventArgs e)
         {
             //only allow settings change if not sniffing
             if (!sniffing)
             {
                 Form2 settingswindow = new Form2();
-                if(settingswindow.ShowDialog(this)==DialogResult.OK)
+                if (settingswindow.ShowDialog(this) == DialogResult.OK)
                 { MessageBox.Show("Settings Applied"); }
                 else { MessageBox.Show("Error:Settings did not apply properly"); }
                 settingswindow.Dispose();
@@ -292,7 +358,7 @@ namespace DNSSniffer
             }
             else
                 MessageBox.Show("To access settings, stop sniffing.");
-        }
+        }//settingsbtn
 
         private void Form1_Load(object sender, EventArgs e)
         {
