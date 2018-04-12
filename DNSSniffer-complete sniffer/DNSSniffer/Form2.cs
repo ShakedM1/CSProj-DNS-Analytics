@@ -10,16 +10,16 @@ using System.Windows.Forms;
 
 namespace DNSSniffer
 {
-    public partial class Form2 : Form
+    public partial class Settings : MainForm
     {
-        public Form2()
+        public Settings()
         {
             InitializeComponent();
             SetComboBox();
             SetTextBox();
         }
 
-        private void Form2_Load(object sender, EventArgs e)
+        private void Settings_Load(object sender, EventArgs e)
         {
 
         }
